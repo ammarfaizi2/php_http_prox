@@ -53,14 +53,14 @@ $url = "https://{$domain}".$_SERVER["REQUEST_URI"];
 $urlHash = md5($url);
 
 $cacheBodyFile = CACHE_DIR."/".$urlHash;
-$cacheHeaderFile = CACHE_DIR."/".$urlHash.".hdr";
+$cacheHeaderFile = CACHE_DIR."/".$urlHash.".hdr.gz";
 
 if (
   (!$needReqBody) &&
   file_exists($cacheBodyFile) &&
   file_exists($cacheHeaderFile)
 ) {
-  $headers = json_decode(file_get_contents($cacheHeaderFile), true);
+  $headers = json_decode(gzdecode(file_get_contents($cacheHeaderFile)), true);
   foreach ($headers as $v) {
     header($v);
   }
@@ -117,7 +117,7 @@ curl($url, $opt);
 
 if (!$needReqBody) {
   file_put_contents($cacheHeaderFile, json_encode($cacheHeader));
-  file_put_contents($cacheBodyFile, $cacheBody);
+  file_put_contents($cacheBodyFile, gzencode($cacheBody, 9));
 }
 
 /** 
