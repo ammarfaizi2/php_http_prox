@@ -52,19 +52,23 @@ $needReqBody = ($_SERVER["REQUEST_METHOD"] !== "GET");
 $url = "https://{$domain}".$_SERVER["REQUEST_URI"];
 $urlHash = md5($url);
 
-$cacheBodyFile = CACHE_DIR."/".$urlHash;
-$cacheHeaderFile = CACHE_DIR."/".$urlHash.".hdr.gz";
+$cacheFile = CACHE_DIR."/".$urlHash;
 
-if (
-  (!$needReqBody) &&
-  file_exists($cacheBodyFile) &&
-  file_exists($cacheHeaderFile)
-) {
-  $headers = json_decode(gzdecode(file_get_contents($cacheHeaderFile)), true);
+if ((!$needReqBody) && file_exists($cacheFile)) {
+
+  $handle = fopen($cacheFile, "rb");
+  $headerLen = unpack("S", fread($handle, 2))[1];
+  $headers = explode("\0", gzdecode(fread($handle, $headerLen)));
   foreach ($headers as $v) {
     header($v);
   }
-  readfile($cacheBodyFile);
+
+  while (!feof($handle)) {
+    echo fread($handle, 1024);
+  }
+
+  fclose($r);
+
   exit;
 }
 
@@ -78,7 +82,12 @@ if ($counter >= (count(TOR_PROXIES) - 1)) {
 file_put_contents($counterFile, $counter + 1);
 
 $cacheHeader = [];
-$cacheBody = "";
+
+if (!$needReqBody) {
+  $handle = fopen($cacheFile, "wb");
+} else {
+  $handle = null;
+}
 
 $opt = [
   CURLOPT_PROXY => TOR_PROXIES[$counter],
@@ -88,9 +97,19 @@ $opt = [
     $cacheHeader[] = $hdr;
     return strlen($hdr);
   },
-  CURLOPT_WRITEFUNCTION => function ($ch, $str) use (&$cacheBody) {
+  CURLOPT_WRITEFUNCTION => function ($ch, $str) use($handle, &$cacheHeader) {
+
+    if ($handle) {
+      if ($cacheHeader) {
+        $cacheHeader = gzencode(implode("\0", $cacheHeader), 9);
+        fwrite($handle, pack("S", strlen($cacheHeader)));
+        fwrite($handle, $cacheHeader);
+        $cacheHeader = null;
+      }
+      fwrite($handle, $str);
+    }
+
     echo $str;
-    $cacheBody .= $str;
     return strlen($str);
   }
 ];
@@ -114,11 +133,7 @@ if ($needReqBody) {
 }
 
 curl($url, $opt);
-
-if (!$needReqBody) {
-  file_put_contents($cacheHeaderFile, gzencode(json_encode($cacheHeader, JSON_UNESCAPED_SLASHES), 9));
-  file_put_contents($cacheBodyFile, $cacheBody);
-}
+fclose($handle);
 
 /** 
  * @param string $url
