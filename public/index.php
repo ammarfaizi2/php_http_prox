@@ -38,7 +38,14 @@ if (!isset($_SERVER["DOMAIN_TARGET"])) {
   ex_err("DOMAIN_TARGET is not defined!");
 }
 
-$domain = $_SERVER["DOMAIN_TARGET"];
+require __DIR__."/../mapper.php";
+
+$domain = DOMAIN_MAP[$_SERVER["DOMAIN_TARGET"]] ?? null;
+
+if (!isset($domain)) {
+  ex_err("DOMAIN_TARGET does not exist in DOMAIN_MAP: {$_SERVER["DOMAIN_TARGET"]}");
+}
+
 $counterFile = COUNTER_DIR."/".$domain;
 $counter = file_exists($counterFile) ? (int)file_get_contents($counterFile) : 0;
 
