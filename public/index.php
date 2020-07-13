@@ -116,8 +116,8 @@ if ($needReqBody) {
 curl($url, $opt);
 
 if (!$needReqBody) {
-  file_put_contents($cacheHeaderFile, json_encode($cacheHeader));
-  file_put_contents($cacheBodyFile, gzencode($cacheBody, 9));
+  file_put_contents($cacheHeaderFile, gzencode(json_encode($cacheHeader, JSON_UNESCAPED_SLASHES), 9));
+  file_put_contents($cacheBodyFile, $cacheBody);
 }
 
 /** 
