@@ -1,5 +1,6 @@
 <?php
 
+const CACHE_DIR = __DIR__."/../storage/cache";
 const COUNTER_DIR = __DIR__."/../counter";
 const TOR_PROXIES = [
   "68.183.184.174:64500",
@@ -46,6 +47,27 @@ if (!isset($domain)) {
   ex_err("DOMAIN_TARGET does not exist in DOMAIN_MAP: {$_SERVER["DOMAIN_TARGET"]}");
 }
 
+$needReqBody = ($_SERVER["REQUEST_METHOD"] !== "GET");
+
+$url = "https://{$domain}".$_SERVER["REQUEST_URI"];
+$urlHash = md5($url);
+
+$cacheBodyFile = CACHE_DIR."/".$urlHash;
+$cacheHeaderFile = CACHE_DIR."/".$urlHash.".hdr";
+
+if (
+  (!$needReqBody) &&
+  file_exists($cacheBodyFile) &&
+  file_exists($cacheHeaderFile)
+) {
+  $headers = json_decode(file_get_contents($cacheHeaderFile), true);
+  foreach ($headers as $v) {
+    header($v);
+  }
+  readfile($cacheBodyFile);
+  exit;
+}
+
 $counterFile = COUNTER_DIR."/".$domain;
 $counter = file_exists($counterFile) ? (int)file_get_contents($counterFile) : 0;
 
@@ -55,16 +77,20 @@ if ($counter >= (count(TOR_PROXIES) - 1)) {
 
 file_put_contents($counterFile, $counter + 1);
 
+$cacheHeader = [];
+$cacheBody = "";
 
 $opt = [
   CURLOPT_PROXY => TOR_PROXIES[$counter],
   CURLOPT_PROXYTYPE => CURLPROXY_SOCKS5,
-  CURLOPT_HEADERFUNCTION => function ($ch, $hdr) {
+  CURLOPT_HEADERFUNCTION => function ($ch, $hdr) use (&$cacheHeader) {
     header($hdr);
+    $cacheHeader[] = $hdr;
     return strlen($hdr);
   },
-  CURLOPT_WRITEFUNCTION => function ($ch, $str) {
+  CURLOPT_WRITEFUNCTION => function ($ch, $str) use (&$cacheBody) {
     echo $str;
+    $cacheBody .= $str;
     return strlen($str);
   }
 ];
@@ -82,12 +108,17 @@ foreach (getallheaders() as $k => $v) {
 
 $opt[CURLOPT_HTTPHEADER] = $headersReq;
 
-if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+if ($needReqBody) {
   $opt[CURLOPT_CUSTOMREQUEST] = $_SERVER["REQUEST_METHOD"];
   $opt[CURLOPT_POSTFIELDS] = file_get_contents("php://input");
 }
 
-curl("https://{$domain}".$_SERVER["REQUEST_URI"], $opt);
+curl($url, $opt);
+
+if (!$needReqBody) {
+  file_put_contents($cacheHeaderFile, json_encode($cacheHeader));
+  file_put_contents($cacheBodyFile, $cacheBody);
+}
 
 /** 
  * @param string $url
