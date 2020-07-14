@@ -54,23 +54,23 @@ $urlHash = md5($url);
 
 $cacheFile = CACHE_DIR."/".$urlHash;
 
-if ((!$needReqBody) && file_exists($cacheFile)) {
+// if ((!$needReqBody) && file_exists($cacheFile)) {
 
-  $handle = fopen($cacheFile, "rb");
-  $headerLen = unpack("S", fread($handle, 2))[1];
-  $headers = explode("\0", gzdecode(fread($handle, $headerLen)));
-  foreach ($headers as $v) {
-    header($v);
-  }
+//   $handle = fopen($cacheFile, "rb");
+//   $headerLen = unpack("S", fread($handle, 2))[1];
+//   $headers = explode("\0", gzdecode(fread($handle, $headerLen)));
+//   foreach ($headers as $v) {
+//     header($v);
+//   }
 
-  while (!feof($handle)) {
-    echo fread($handle, 1024);
-  }
+//   while (!feof($handle)) {
+//     echo fread($handle, 1024);
+//   }
 
-  fclose($r);
+//   fclose($r);
 
-  exit;
-}
+//   exit;
+// }
 
 $counterFile = COUNTER_DIR."/".$domain;
 $counter = file_exists($counterFile) ? (int)file_get_contents($counterFile) : 0;
@@ -84,7 +84,7 @@ file_put_contents($counterFile, $counter + 1);
 $cacheHeader = [];
 
 if (!$needReqBody) {
-  $handle = fopen($cacheFile, "wb");
+  // $handle = fopen($cacheFile, "wb");
 } else {
   $handle = null;
 }
@@ -94,20 +94,20 @@ $opt = [
   CURLOPT_PROXYTYPE => CURLPROXY_SOCKS5,
   CURLOPT_HEADERFUNCTION => function ($ch, $hdr) use (&$cacheHeader) {
     header($hdr);
-    $cacheHeader[] = $hdr;
+    // $cacheHeader[] = $hdr;
     return strlen($hdr);
   },
-  CURLOPT_WRITEFUNCTION => function ($ch, $str) use($handle, &$cacheHeader) {
+  CURLOPT_WRITEFUNCTION => function ($ch, $str) use(&$handle, &$cacheHeader) {
 
-    if ($handle) {
-      if ($cacheHeader) {
-        $cacheHeader = gzencode(implode("\0", $cacheHeader), 9);
-        fwrite($handle, pack("S", strlen($cacheHeader)));
-        fwrite($handle, $cacheHeader);
-        $cacheHeader = null;
-      }
-      fwrite($handle, $str);
-    }
+    // if ($handle) {
+    //   if ($cacheHeader) {
+    //     $cacheHeader = gzencode(implode("\0", $cacheHeader), 9);
+    //     fwrite($handle, pack("S", strlen($cacheHeader)));
+    //     fwrite($handle, $cacheHeader);
+    //     $cacheHeader = null;
+    //   }
+    //   fwrite($handle, $str);
+    // }
 
     echo $str;
     return strlen($str);
@@ -121,6 +121,7 @@ const IGNORE_HEADERS = [
 $headersReq = [];
 foreach (getallheaders() as $k => $v) {
   if (!in_array($k, IGNORE_HEADERS)) {
+    $v = str_replace($_SERVER["DOMAIN_TARGET"], $domain, $v);
     $headersReq[] = "{$k}: {$v}";
   }
 }
@@ -133,7 +134,7 @@ if ($needReqBody) {
 }
 
 curl($url, $opt);
-fclose($handle);
+$handle and fclose($handle);
 
 /** 
  * @param string $url
