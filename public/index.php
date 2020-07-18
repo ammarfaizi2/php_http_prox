@@ -1,7 +1,5 @@
 <?php
 
-$_SERVER["HTTP_HOST"] = "saucenao.com";
-
 const COUNTER_DIR = __DIR__."/../counter";
 const CACHE_DIR = __DIR__."/../storage/cache";
 const TOR_PROXIES = [
